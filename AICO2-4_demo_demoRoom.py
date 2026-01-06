@@ -15,44 +15,44 @@ import threading
 import sys
 sys.path.insert(0, "../lib_py")
 import flexivdrdk
+import flexivrdk
 import flexivamr
 
 
 # connect and initialize arm and AMR
-def sys_init(arm_sn, AMR_ip, logger):
-    arm = connect_arm(arm_sn, logger)
+def sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger):
+    arm_pair = connect_arm_pair(arm_L_sn, arm_R_sn, logger)
     AMR_states, navigator = connect_AMR(AMR_ip, logger)
 
-    return arm, AMR_states, navigator
+    return arm_pair, AMR_states, navigator
 
 
 # initialize RDK and instantiate arm objects
-def connect_arm(arm_sn, logger):
-    arm = flexivrdk.Robot(arm_sn)
+def connect_arm_pair(arm_L_sn, arm_R_sn, logger):
+    arm_pair = flexivdrdk.RobotPair([arm_L_sn, arm_R_sn])
 
-    # Clear fault on arm server if any
-    if arm.fault():
-        logger.warn("Fault occurred on arm server, trying to clear ...")
-        # Try to clear the fault
-        arm.clearFault()
-        time.sleep(2)
-        # Check again
-        if arm.fault():
+    # Clear fault on the connected robot if any
+    if arm_pair.fault():
+        logger.warn("Fault occurred on the connected arm, trying to clear ...")
+        # Try to clear the fault on both robots
+        result = arm_pair.ClearFault()
+        # If fault is not cleared on both robots
+        if not (result[0] and result[1]):
             logger.error("Fault cannot be cleared, exiting ...")
-            return
-        logger.info("Fault on arm server is cleared.")
+            return 1
+        logger.info("Fault on the connected arm is cleared")
 
-    # Enable the arm, make sure the E-stop is released before enabling
-    logger.info("Enabling arm ...")
-    arm.Enable()
+    # Enable the pair of robots, make sure the E-stop is released before enabling
+    logger.info("Enabling arms ...")
+    arm_pair.Enable()
 
     # Wait for the arm to become operational
-    while not arm.operational():
+    while not arm_pair.operational():
         time.sleep(1)
 
-    logger.info("Arm is now operational.")
+    logger.info("Both arms are now operational")
 
-    return arm
+    return arm_pair
 
 
 # initialize Seer AMR API
@@ -118,13 +118,8 @@ def init_AMR(states, control, configure, logger):
         # execute relocation
         reloc = control.Relocation()
 
-        # manual recolation with AMR location
-        reloc.x = 2.0
-        reloc.y = -3.7
-        reloc.angle = 3.14159
-
         # automatic relocation - AMR Version 3.4.6.18 and above
-        # reloc.is_auto = True
+        reloc.is_auto = True
 
         control.perform_relocation(reloc)
         while states.check_relocation_status().reloc_status == 2:
@@ -132,7 +127,7 @@ def init_AMR(states, control, configure, logger):
             time.sleep(1)
 
         # AMR Version 3.4.6.18 and above do not require calling the confirmation positioning API again.
-        control.confirm_correct_location()  
+        # control.confirm_correct_location()  
 
         if states.check_relocation_status().reloc_status == 1:
             logger.info("AMR is relocalized")
@@ -141,59 +136,83 @@ def init_AMR(states, control, configure, logger):
 
 
 # execute routines with arm plans and move Seer AMR
-def execute_routines(arm, AMR_states, navigator, logger):
+def execute_routines(arm_pair, AMR_states, navigator, logger):
     # move arm to the home pose and reset gripper
-    execute_arm_plan('AMR_demo_gripper_init', arm, logger)
+    execute_arm_plan(['AICO2_demo_gripper_L_init', 'AICO2_demo_gripper_L_init'], arm_pair, logger)
     logger.info("Gripper initialized.")
 
-    # move arm to the home pose and reset gripper
-    execute_arm_plan('AMR_demo_arm_init', arm, logger)
-    logger.info("Arm reseted.")
+    # # move arm to the home pose and reset gripper
+    # execute_arm_plan('AMR_demo_arm_init', arm, logger)
+    # logger.info("Arm reseted.")
     
-    # move AMR to the insertion location (LM4)
-    move_AMR(AMR_states, navigator, logger, start="LM1", target="LM3")
-    logger.info("Move to plug-in station.")
+    # # move AMR to the insertion location (LM4)
+    # move_AMR(AMR_states, navigator, logger, start="LM1", target="LM3")
+    # logger.info("Move to plug-in station.")
 
-    # calibrated work coordinate
-    execute_arm_plan('AMR_demo_workCoord_cali', arm, logger)
-    logger.info("Work coordinate calibrated.")
+    # # calibrated work coordinate
+    # execute_arm_plan('AMR_demo_workCoord_cali', arm, logger)
+    # logger.info("Work coordinate calibrated.")
 
-    # perform insertion
-    execute_arm_plan('AMR_demo_insert_USB', arm, logger)
-    logger.info("Finish USB insertion.")
+    # # perform insertion
+    # execute_arm_plan('AMR_demo_insert_USB', arm, logger)
+    # logger.info("Finish USB insertion.")
 
-    # reset arm
-    execute_arm_plan('AMR_demo_arm_init', arm, logger)
-    logger.info("Reset arm.")
+    # # reset arm
+    # execute_arm_plan('AMR_demo_arm_init', arm, logger)
+    # logger.info("Reset arm.")
 
-    # move AMR back to home (LM1)
-    move_AMR(AMR_states, navigator, logger, start="LM3", target="LM1")
+    # # move AMR back to home (LM1)
+    # move_AMR(AMR_states, navigator, logger, start="LM3", target="LM1")
     logger.info("Move back to home.")
 
 
 # execute arm plans
-def execute_arm_plan(name, arm, logger):
-    # switch to plan execution mode
-    arm.SwitchMode(flexivrdk.Mode.NRT_PLAN_EXECUTION)
+def execute_arm_plan(plan_names, arm_pair, logger):
+    # Create an event to signal the thread to stop
+    stop_event = threading.Event()
 
-    # execute plan by name
-    logger.info(f"Arm: execute {name}")
-    arm.ExecutePlan(name, False)
+    def plans_execute():
+        # switch to plan execution mode
+        arm_pair.SwitchMode(flexivrdk.Mode.NRT_PLAN_EXECUTION)
 
-    # print current plan
-    while arm.busy():
-        plan_info = arm.plan_info()
-        logger.info(" ")
-        print(f"assigned_plan_name: {plan_info.assigned_plan_name}")
-        print(f"pt_name: {plan_info.pt_name}")
-        print(f"node_name: {plan_info.node_name}")
-        print(f"node_path: {plan_info.node_path}")
-        print(f"node_path_time_period: {plan_info.node_path_time_period}")
-        print(f"node_path_number: {plan_info.node_path_number}")
-        print(f"velocity_scale: {plan_info.velocity_scale}")
-        print(f"waiting_for_step: {plan_info.waiting_for_step}")
-        print("", flush=True)
-        time.sleep(1)
+        # execute plan by name
+        logger.info(f"Left Arm: execute {plan_names[0]}")
+        logger.info(f"Right Arm: execute {plan_names[1]}")
+
+        arm_pair.ExecutePlan(plan_names, False)
+
+        # print current plan
+        while arm_pair.busy() or not stop_event.is_set():
+            left_arm_plan_info, right_arm_plan_info = arm_pair.plan_info()
+            logger.info(" ")
+            # print(f"assigned_plan_name: {left_arm_plan_info.assigned_plan_name}")
+            print(f"left_pt_name: {left_arm_plan_info.pt_name}")
+            print(f"right_pt_name: {right_arm_plan_info.pt_name}")
+            # print(f"node_name: {left_arm_plan_info.node_name}")
+            # print(f"node_path: {left_arm_plan_info.node_path}")
+            # print(f"node_path_time_period: {left_arm_plan_info.node_path_time_period}")
+            # print(f"node_path_number: {left_arm_plan_info.node_path_number}")
+            # print(f"velocity_scale: {plan_left_arm_plan_infoinfo.velocity_scale}")
+            # print(f"waiting_for_step: {left_arm_plan_info.waiting_for_step}")
+            # print("", flush=True)
+            time.sleep(1)
+    
+    # Thread for executing both arms plan
+    plans_execute_thread = threading.Thread(target=plans_execute, args=[stop_event])
+    plans_execute_thread.start()
+
+    # Use main thread to catch keyboard interrupt and exit thread
+    try:
+        while not stop_event.is_set():
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        # Send signal to exit thread
+        logger.info("Stopping plans execute thread")
+        stop_event.set()
+
+    # Wait for thread to exit
+    plans_execute_thread.join()
+    logger.info("Plans execute thread exited")
 
 
 # move Seer AMR
@@ -253,18 +272,38 @@ def move_AMR(states, navigator, logger, start, target):
 
 # caller function
 def main():
-    arm_sn = "Rizon4-062143"
+    # Create an event to signal the thread to stop
+    stop_event = threading.Event()
+
+    arm_L_sn = "Rizon4-062143"
+    arm_R_sn = "Rizon4-062143"
     AMR_ip = "192.168.1.2"
     
     try:
         logger = spdlog.ConsoleLogger("AMR Demo")
-        arm, AMR_states, navigator = sys_init(arm_sn, AMR_ip, logger)
-        execute_routines(arm, AMR_states, navigator, logger)
+        robot_pair, AMR_states, navigator = sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger)
+        execute_routines(robot_pair, AMR_states, navigator, logger)
 
     except Exception as e:
         logger.error(str(e))
     except KeyboardInterrupt as e:
         logger.error(str(e) + " by user")
+
+    # # Start the 'execute_routines' thread
+    # print_thread = threading.Thread(
+    #     target=execute_routines, args=[robot_pair, AMR_states, navigator, logger, stop_event]
+    # )
+    # print_thread.start()
+
+    # try:
+    #     while not stop_event.is_set():
+    #         time.sleep(0.1)
+    # except KeyboardInterrupt as e:
+    #     logger.error(str(e) + " by user")
+
+    # Wait for thread to exit
+    # print_thread.join()
+    # logger.info("Print thread exited")
 
 
 if __name__ == "__main__":
