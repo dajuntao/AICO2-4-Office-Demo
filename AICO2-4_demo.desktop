@@ -1,0 +1,9 @@
+[Desktop Entry]
+Encoding=UTF-8
+Type=Application
+Name=AICO2 Universal Plug-in Demo
+Path=/home/dajuntao/Documents/AICO2-4-Office-Demo
+Exec=python3 /home/Documents/AICO2-4-Office-Demo/AICO2-4_universal_plugin_demo.py
+Icon=/usr/bin/flexiv/ElementsLauncher/flexivicon_512.png
+Terminal=true
+StartupNotify=false
