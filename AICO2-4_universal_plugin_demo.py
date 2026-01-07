@@ -13,7 +13,7 @@ import threading
 
 # Import Flexiv DRDK and Seer AMR Python library
 import sys
-sys.path.insert(0, "../lib_py")
+sys.path.insert(0, "../flexivamr_lib_py")
 import flexivdrdk
 import flexivamr
 
