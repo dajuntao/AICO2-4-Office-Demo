@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-"""AMR-arm_demo_demoRoom.py
+"""AICO2-4_demo_demoRoom.py
 """
 
-__copyright__ = "Copyright (C) 2016-2025 Flexiv Ltd. All Rights Reserved."
+__copyright__ = "Copyright (C) 2016-2026 Flexiv Ltd. All Rights Reserved."
 __author__ = "Flexiv"
 
 import time
@@ -11,11 +11,10 @@ import spdlog  # pip install spdlog
 import select
 import threading
 
-# Import Flexiv RDK and Seer AMR Python library
+# Import Flexiv DRDK and Seer AMR Python library
 import sys
 sys.path.insert(0, "../lib_py")
 import flexivdrdk
-import flexivrdk
 import flexivamr
 
 
@@ -138,32 +137,32 @@ def init_AMR(states, control, configure, logger):
 # execute routines with arm plans and move Seer AMR
 def execute_routines(arm_pair, AMR_states, navigator, logger):
     # move arm to the home pose and reset gripper
-    execute_arm_plan(['AICO2_demo_gripper_L_init', 'AICO2_demo_gripper_L_init'], arm_pair, logger)
-    logger.info("Gripper initialized.")
+    execute_arm_plan(['AICO2_gripper_init_L', 'AICO2_gripperinit_R'], arm_pair, logger)
+    logger.info("Both Grippers are initialized.")
 
-    # # move arm to the home pose and reset gripper
+    # move arm to the home pose and reset gripper
     # execute_arm_plan('AMR_demo_arm_init', arm, logger)
     # logger.info("Arm reseted.")
     
-    # # move AMR to the insertion location (LM4)
+    # move AMR to the insertion location (LM4)
     # move_AMR(AMR_states, navigator, logger, start="LM1", target="LM3")
     # logger.info("Move to plug-in station.")
 
-    # # calibrated work coordinate
+    # calibrated work coordinate
     # execute_arm_plan('AMR_demo_workCoord_cali', arm, logger)
     # logger.info("Work coordinate calibrated.")
 
-    # # perform insertion
+    # perform insertion
     # execute_arm_plan('AMR_demo_insert_USB', arm, logger)
     # logger.info("Finish USB insertion.")
 
-    # # reset arm
+    # reset arm
     # execute_arm_plan('AMR_demo_arm_init', arm, logger)
     # logger.info("Reset arm.")
 
-    # # move AMR back to home (LM1)
+    # move AMR back to home (LM1)
     # move_AMR(AMR_states, navigator, logger, start="LM3", target="LM1")
-    logger.info("Move back to home.")
+    # logger.info("Move back to home.")
 
 
 # execute arm plans
@@ -171,17 +170,17 @@ def execute_arm_plan(plan_names, arm_pair, logger):
     # Create an event to signal the thread to stop
     stop_event = threading.Event()
 
+    # Execute two plans from both arms
     def plans_execute():
         # switch to plan execution mode
-        arm_pair.SwitchMode(flexivrdk.Mode.NRT_PLAN_EXECUTION)
+        arm_pair.SwitchMode(flexivdrdk.Mode.NRT_PLAN_EXECUTION)
 
-        # execute plan by name
+        # execute plans by name
         logger.info(f"Left Arm: execute {plan_names[0]}")
         logger.info(f"Right Arm: execute {plan_names[1]}")
-
         arm_pair.ExecutePlan(plan_names, False)
 
-        # print current plan
+        # print current plans output
         while arm_pair.busy() or not stop_event.is_set():
             left_arm_plan_info, right_arm_plan_info = arm_pair.plan_info()
             logger.info(" ")
@@ -194,7 +193,7 @@ def execute_arm_plan(plan_names, arm_pair, logger):
             # print(f"node_path_number: {left_arm_plan_info.node_path_number}")
             # print(f"velocity_scale: {plan_left_arm_plan_infoinfo.velocity_scale}")
             # print(f"waiting_for_step: {left_arm_plan_info.waiting_for_step}")
-            # print("", flush=True)
+            print("", flush=True)
             time.sleep(1)
     
     # Thread for executing both arms plan
@@ -275,35 +274,21 @@ def main():
     # Create an event to signal the thread to stop
     stop_event = threading.Event()
 
-    arm_L_sn = "Rizon4-062143"
-    arm_R_sn = "Rizon4-062143"
-    AMR_ip = "192.168.1.2"
+    arm_L_sn = "Rizon4-063048"
+    arm_R_sn = "Rizon4R-062059"
+    AMR_ip = "192.168.1.110"
     
     try:
-        logger = spdlog.ConsoleLogger("AMR Demo")
+        logger = spdlog.ConsoleLogger("AICO2 Universal Plug-in Demo")
         robot_pair, AMR_states, navigator = sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger)
+
+        # run AICO2 demo routines
         execute_routines(robot_pair, AMR_states, navigator, logger)
 
     except Exception as e:
         logger.error(str(e))
     except KeyboardInterrupt as e:
-        logger.error(str(e) + " by user")
-
-    # # Start the 'execute_routines' thread
-    # print_thread = threading.Thread(
-    #     target=execute_routines, args=[robot_pair, AMR_states, navigator, logger, stop_event]
-    # )
-    # print_thread.start()
-
-    # try:
-    #     while not stop_event.is_set():
-    #         time.sleep(0.1)
-    # except KeyboardInterrupt as e:
-    #     logger.error(str(e) + " by user")
-
-    # Wait for thread to exit
-    # print_thread.join()
-    # logger.info("Print thread exited")
+        logger.error(str(e) + " by user.")
 
 
 if __name__ == "__main__":
