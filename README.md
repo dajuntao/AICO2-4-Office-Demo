@@ -21,3 +21,9 @@ under /flexivamr_lib_py
 | --------------------------- | ----------------------- |
 | Linux (Ubuntu 20.04+) (x86) | 3.8, 3.10               |
 | MacOS 12+ (arm64)           | 3.8, 3.10, 3.12         |
+
+## Linux Desktop Executable
+
+1. drag the executable file to Linux desktop.
+2. change the path and the python project directory according to the "AICO2-4-Office-Demo" directory.
+3. right-click the executable to enable "Allow Launching".
