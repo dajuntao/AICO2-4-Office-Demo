@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""AICO2-4_demo_demoRoom.py
+"""AICO2-4_universal_plugin_demo.py
 """
 
 __copyright__ = "Copyright (C) 2016-2026 Flexiv Ltd. All Rights Reserved."
