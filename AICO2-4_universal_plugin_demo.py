@@ -13,7 +13,8 @@ import threading
 
 # Import Flexiv DRDK and Seer AMR Python library
 import sys
-sys.path.insert(0, "../flexivamr_lib_py")
+sys.path.insert(0, "./flexivamr_lib_py")
+import flexivrdk
 import flexivdrdk
 import flexivamr
 
@@ -32,14 +33,14 @@ def connect_arm_pair(arm_L_sn, arm_R_sn, logger):
 
     # Clear fault on the connected robot if any
     if arm_pair.fault():
-        logger.warn("Fault occurred on the connected arm, trying to clear ...")
+        logger.warn("[Arm] Fault occurred on the connected arm, trying to clear ...")
         # Try to clear the fault on both robots
         result = arm_pair.ClearFault()
         # If fault is not cleared on both robots
         if not (result[0] and result[1]):
-            logger.error("Fault cannot be cleared, exiting ...")
+            logger.error("[Arm] Fault cannot be cleared, exiting ...")
             return 1
-        logger.info("Fault on the connected arm is cleared")
+        logger.info("[Arm] Fault on the connected arm is cleared")
 
     # Enable the pair of robots, make sure the E-stop is released before enabling
     logger.info("Enabling arms ...")
@@ -128,37 +129,49 @@ def init_AMR(states, control, configure, logger):
         # AMR Version 3.4.6.18 and above do not require calling the confirmation positioning API again.
         # control.confirm_correct_location()  
 
-        if states.check_relocation_status().reloc_status == 1:
-            logger.info("AMR is relocalized")
-        else:
-            raise Exception("AMR cannot be relocalized")
+    if states.check_relocation_status().reloc_status == 1:
+        logger.info("AMR is relocalized")
+    else:
+        raise Exception("AMR cannot be relocalized")
 
 
 # execute routines with arm plans and move Seer AMR
-def execute_routines(arm_pair, AMR_states, navigator, logger):
-    # move arm to the home pose and reset gripper
-    execute_arm_plan(['AICO2_gripper_init_L', 'AICO2_gripperinit_R'], arm_pair, logger)
+def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
+    # create two instances for both arms
+    L_arm, R_arm = arm_pair.instances()
+
+    # initialize gripper
+    execute_arm_plan([arm_plans['gripper_init'] + 'L', arm_plans['gripper_init'] + 'R'], arm_pair, logger)
     logger.info("Both Grippers are initialized.")
 
-    # move arm to the home pose and reset gripper
-    # execute_arm_plan('AMR_demo_arm_init', arm, logger)
-    # logger.info("Arm reseted.")
+    # move arm to the home pose and reset gripper width
+    execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
+    logger.info("Reset Arms home pose and Grippers home width.")
     
     # move AMR to the insertion location (LM4)
     # move_AMR(AMR_states, navigator, logger, start="LM1", target="LM3")
     # logger.info("Move to plug-in station.")
 
-    # calibrated work coordinate
-    # execute_arm_plan('AMR_demo_workCoord_cali', arm, logger)
-    # logger.info("Work coordinate calibrated.")
+    # calibrated work coordinate and synch the new work coordinate in both arms
+    execute_arm_plan([arm_plans['work_coord_calib'] + 'L', arm_plans['wait'] + 'R'], arm_pair, logger)
+    R_arm.SetGlobalVariables({'workCoord': arm_pair.global_variables()[0]['workCoord']}) # synch the left arm work coordinate with the right arm
+    logger.info("Work coordinate calibrated and synched.")
 
-    # perform insertion
-    # execute_arm_plan('AMR_demo_insert_USB', arm, logger)
-    # logger.info("Finish USB insertion.")
+    # move arm to transition + pickup BNC
+    execute_arm_plan([arm_plans['transition_coord'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
+    logger.info("Moves Left arm to transition pose while the right arm picks up BNC.")
 
-    # reset arm
-    # execute_arm_plan('AMR_demo_arm_init', arm, logger)
-    # logger.info("Reset arm.")
+    # move arm to pickup 500v + curl
+    execute_arm_plan([arm_plans['pick-up'] + '500v_L', arm_plans['curl-up'] + 'R'], arm_pair, logger)
+    logger.info("Moves Left arm to pickup the 500v connector pose while the right arm curls up to clear obstacles.")
+
+    # move to plug-in + plug-in
+    execute_arm_plan([arm_plans['plug-in'] + '500v_L', arm_plans['plug-in'] + 'BNC_R'], arm_pair, logger)
+    logger.info("Moves Left arm to plug in the 500v connector pose while the right arm plugs-in to BNC.")
+
+    # move arm to the home pose and reset gripper width
+    execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
+    logger.info("Reset Arms home pose and Grippers home width.")
 
     # move AMR back to home (LM1)
     # move_AMR(AMR_states, navigator, logger, start="LM3", target="LM1")
@@ -173,7 +186,7 @@ def execute_arm_plan(plan_names, arm_pair, logger):
     # Execute two plans from both arms
     def plans_execute():
         # switch to plan execution mode
-        arm_pair.SwitchMode(flexivdrdk.Mode.NRT_PLAN_EXECUTION)
+        arm_pair.SwitchMode(flexivrdk.Mode.NRT_PLAN_EXECUTION)
 
         # execute plans by name
         logger.info(f"Left Arm: execute {plan_names[0]}")
@@ -181,13 +194,15 @@ def execute_arm_plan(plan_names, arm_pair, logger):
         arm_pair.ExecutePlan(plan_names, False)
 
         # print current plans output
-        while arm_pair.busy() or not stop_event.is_set():
+        while arm_pair.busy():
             left_arm_plan_info, right_arm_plan_info = arm_pair.plan_info()
             logger.info(" ")
-            # print(f"assigned_plan_name: {left_arm_plan_info.assigned_plan_name}")
-            print(f"left_pt_name: {left_arm_plan_info.pt_name}")
-            print(f"right_pt_name: {right_arm_plan_info.pt_name}")
-            # print(f"node_name: {left_arm_plan_info.node_name}")
+            print(f"left_plan_name: {left_arm_plan_info.assigned_plan_name}")
+            print(f"left_node_name: {left_arm_plan_info.node_name}")
+            # print(f"left_pt_name: {left_arm_plan_info.pt_name}")
+            print(f"right_plan_name: {right_arm_plan_info.assigned_plan_name}")
+            print(f"right_node_name: {right_arm_plan_info.node_name}")
+            # print(f"right_pt_name: {right_arm_plan_info.pt_name}")
             # print(f"node_path: {left_arm_plan_info.node_path}")
             # print(f"node_path_time_period: {left_arm_plan_info.node_path_time_period}")
             # print(f"node_path_number: {left_arm_plan_info.node_path_number}")
@@ -197,13 +212,13 @@ def execute_arm_plan(plan_names, arm_pair, logger):
             time.sleep(1)
     
     # Thread for executing both arms plan
-    plans_execute_thread = threading.Thread(target=plans_execute, args=[stop_event])
+    plans_execute_thread = threading.Thread(target=plans_execute)
     plans_execute_thread.start()
 
     # Use main thread to catch keyboard interrupt and exit thread
     try:
-        while not stop_event.is_set():
-            time.sleep(0.1)
+        while arm_pair.busy() and not stop_event.is_set():
+            time.sleep(1)
     except KeyboardInterrupt:
         # Send signal to exit thread
         logger.info("Stopping plans execute thread")
@@ -277,13 +292,24 @@ def main():
     arm_L_sn = "Rizon4-063048"
     arm_R_sn = "Rizon4R-062059"
     AMR_ip = "192.168.1.110"
+
+    arm_plans = {
+                    "gripper_init": "AICO2_gripper_init_", 
+                    "arm_homing": "AICO2_arm_init_",
+                    "work_coord_calib": "AICO2_workCoord_calib_",
+                    "transition_coord": "AICO2_transition_",
+                    "pick-up": "AICO2_pick-up_",
+                    "plug-in": "AICO2_plug-in_",
+                    "curl-up": "AICO2_curl-up_",
+                    "wait": "AICO2_wait_"
+                }
     
     try:
         logger = spdlog.ConsoleLogger("AICO2 Universal Plug-in Demo")
         robot_pair, AMR_states, navigator = sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger)
 
         # run AICO2 demo routines
-        execute_routines(robot_pair, AMR_states, navigator, logger)
+        execute_routines(robot_pair, AMR_states, navigator, arm_plans, logger)
 
     except Exception as e:
         logger.error(str(e))
