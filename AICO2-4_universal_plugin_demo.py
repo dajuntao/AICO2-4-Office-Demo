@@ -178,6 +178,9 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         move_AMR(AMR_states, navigator, logger, start="LM3", target="AP1")
         logger.info("[Base] Moved back to home.")
 
+    except Exception as e:
+        logger.info("arm fault in routine")
+        raise Exception("Arm system fault.")
     except KeyboardInterrupt:
         raise KeyboardInterrupt("Routine is canceled")
 
@@ -229,7 +232,10 @@ def execute_arm_plan(plan_names, arm_pair, logger):
     # Use main thread to catch keyboard interrupt and exit thread
     try:
         while arm_pair.busy() and not stop_event.is_set():
-            time.sleep(1)
+            if arm_pair.fault():
+                logger.info("arm fault in move")
+                raise Exception("Arm system fault.")
+            time.sleep(0.1)
     except KeyboardInterrupt:
         # Send signal to exit thread
         logger.info("[Arm] Stopping plans execute thread")
