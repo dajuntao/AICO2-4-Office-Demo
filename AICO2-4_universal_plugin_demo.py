@@ -137,45 +137,49 @@ def init_AMR(states, control, configure, logger):
 
 # execute routines with arm plans and move Seer AMR
 def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
-    # create two instances for both arms
-    L_arm, R_arm = arm_pair.instances()
+    try:
+        # create two instances for both arms
+        L_arm, R_arm = arm_pair.instances()
 
-    # initialize gripper
-    execute_arm_plan([arm_plans['gripper_init'] + 'L', arm_plans['gripper_init'] + 'R'], arm_pair, logger)
-    logger.info("Both Grippers are initialized.")
+        # initialize gripper
+        execute_arm_plan([arm_plans['gripper_init'] + 'L', arm_plans['gripper_init'] + 'R'], arm_pair, logger)
+        logger.info("Both Grippers are initialized.")
 
-    # move arm to the home pose and reset gripper width
-    execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
-    logger.info("Reset Arms home pose and Grippers home width.")
-    
-    # move AMR to the insertion location (LM4)
-    # move_AMR(AMR_states, navigator, logger, start="LM1", target="LM3")
-    # logger.info("Move to plug-in station.")
+        # move arm to the home pose and reset gripper width
+        execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
+        logger.info("Reset Arms home pose and Grippers home width.")
+        
+        # move AMR to the universal plug-in station (LM3)
+        move_AMR(AMR_states, navigator, logger, start="AP1", target="LM3")
+        logger.info("Move to plug-in station.")
 
-    # calibrated work coordinate and synch the new work coordinate in both arms
-    execute_arm_plan([arm_plans['work_coord_calib'] + 'L', arm_plans['wait'] + 'R'], arm_pair, logger)
-    R_arm.SetGlobalVariables({'workCoord': arm_pair.global_variables()[0]['workCoord']}) # synch the left arm work coordinate with the right arm
-    logger.info("Work coordinate calibrated and synched.")
+        # calibrated work coordinate and synch the new work coordinate in both arms
+        execute_arm_plan([arm_plans['work_coord_calib'] + 'L', arm_plans['wait'] + 'R'], arm_pair, logger)
+        R_arm.SetGlobalVariables({'workCoord': arm_pair.global_variables()[0]['workCoord']}) # synch the left arm work coordinate with the right arm
+        logger.info("Work coordinate calibrated and synched.")
 
-    # move arm to transition + pickup BNC
-    execute_arm_plan([arm_plans['transition_coord'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
-    logger.info("Moves Left arm to transition pose while the right arm picks up BNC.")
+        # move arm to transition + pickup BNC
+        execute_arm_plan([arm_plans['transition_coord'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
+        logger.info("Moves Left arm to transition pose while the right arm picks up BNC.")
 
-    # move arm to pickup 500v + curl
-    execute_arm_plan([arm_plans['pick-up'] + '500v_L', arm_plans['curl-up'] + 'R'], arm_pair, logger)
-    logger.info("Moves Left arm to pickup the 500v connector pose while the right arm curls up to clear obstacles.")
+        # move arm to pickup 500v + curl
+        execute_arm_plan([arm_plans['pick-up'] + '500v_L', arm_plans['curl-up'] + 'R'], arm_pair, logger)
+        logger.info("Moves Left arm to pickup the 500v connector pose while the right arm curls up to clear obstacles.")
 
-    # move to plug-in + plug-in
-    execute_arm_plan([arm_plans['plug-in'] + '500v_L', arm_plans['plug-in'] + 'BNC_R'], arm_pair, logger)
-    logger.info("Moves Left arm to plug in the 500v connector pose while the right arm plugs-in to BNC.")
+        # move to plug-in + plug-in
+        execute_arm_plan([arm_plans['plug-in'] + '500v_L', arm_plans['plug-in'] + 'BNC_R'], arm_pair, logger)
+        logger.info("Moves Left arm to plug in the 500v connector pose while the right arm plugs-in to BNC.")
 
-    # move arm to the home pose and reset gripper width
-    execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
-    logger.info("Reset Arms home pose and Grippers home width.")
+        # move arm to the home pose and reset gripper width
+        execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
+        logger.info("Reset Arms home pose and Grippers home width.")
 
-    # move AMR back to home (LM1)
-    # move_AMR(AMR_states, navigator, logger, start="LM3", target="LM1")
-    # logger.info("Move back to home.")
+        # move AMR back to home (AP1)
+        move_AMR(AMR_states, navigator, logger, start="LM3", target="AP1")
+        logger.info("Move back to home.")
+
+    except KeyboardInterrupt:
+        raise KeyboardInterrupt("Routine is canceled")
 
 
 # execute arm plans
@@ -186,7 +190,14 @@ def execute_arm_plan(plan_names, arm_pair, logger):
     # Execute two plans from both arms
     def plans_execute():
         # switch to plan execution mode
-        arm_pair.SwitchMode(flexivrdk.Mode.NRT_PLAN_EXECUTION)
+        while True:
+            try:
+                arm_pair.SwitchMode(flexivrdk.Mode.NRT_PLAN_EXECUTION)
+            except:
+                arm_pair.SwitchMode(flexivrdk.Mode.NRT_PLAN_EXECUTION)
+            else:
+                logger.info("[Arm] The arm is switched to the PLAN_EXECUTION mode.")
+                break
 
         # execute plans by name
         logger.info(f"Left Arm: execute {plan_names[0]}")
@@ -209,7 +220,7 @@ def execute_arm_plan(plan_names, arm_pair, logger):
             # print(f"velocity_scale: {plan_left_arm_plan_infoinfo.velocity_scale}")
             # print(f"waiting_for_step: {left_arm_plan_info.waiting_for_step}")
             print("", flush=True)
-            time.sleep(1)
+            time.sleep(0.1)
     
     # Thread for executing both arms plan
     plans_execute_thread = threading.Thread(target=plans_execute)
@@ -269,11 +280,16 @@ def move_AMR(states, navigator, logger, start, target):
     input_thread.start()
 
     logger.info("navi start status: " + str(navi_states.task_status))
-    while ((navi_states.task_status == 2 or navi_states.task_status != 4) and navi_states.task_status != 6):
-        time.sleep(1)
-        navi_states = states.check_navigation_status()
-        logger.info("target wp: " + str(navi_states.target_id))
-        logger.info("navi status: " + str(navi_states.task_status))
+    try:
+        while ((navi_states.task_status == 2 or navi_states.task_status != 4) and navi_states.task_status != 6):
+            time.sleep(1)
+            navi_states = states.check_navigation_status()
+            logger.info("target wp: " + str(navi_states.target_id))
+            logger.info("navi status: " + str(navi_states.task_status))
+    except KeyboardInterrupt:
+        navigator.cancel_current_navigation()
+        exit_input.set()
+        raise KeyboardInterrupt()
 
     # terminate thread and rejoin the thread
     exit_input.set()
@@ -314,7 +330,7 @@ def main():
     except Exception as e:
         logger.error(str(e))
     except KeyboardInterrupt as e:
-        logger.error(str(e) + " by user.")
+        logger.error(str(e) + " by the user.")
 
 
 if __name__ == "__main__":
