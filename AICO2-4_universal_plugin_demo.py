@@ -149,14 +149,17 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
         logger.info("[Arm] Reset Arms home pose and Grippers home width.")
         
-        # move AMR to the universal plug-in station (LM3)
-        move_AMR(AMR_states, navigator, logger, start="AP1", target="LM3")
-        logger.info("[Base] Moved to plug-in station.")
+        # # move AMR to the universal plug-in station (LM3)
+        # move_AMR(AMR_states, navigator, arm_pair, logger, start="AP1", target="LM3")
+        # logger.info("[Base] Moved to plug-in station.")
 
         # calibrated work coordinate and synch the new work coordinate in both arms
         execute_arm_plan([arm_plans['work_coord_calib'] + 'L', arm_plans['wait'] + 'R'], arm_pair, logger)
         R_arm.SetGlobalVariables({'workCoord': arm_pair.global_variables()[0]['workCoord']}) # synch the left arm work coordinate with the right arm
         logger.info("[Arm] Work coordinate calibrated and synched.")
+
+        # [testing ]arm pair and AMR fault stop behavior test
+        # execute_arm_plan([arm_plans['fault'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
 
         # move arm to transition + pickup BNC
         execute_arm_plan([arm_plans['transition_coord'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
@@ -175,14 +178,17 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         logger.info("[Arm] Reset Arms home pose and Grippers home width.")
 
         # move AMR back to home (AP1)
-        move_AMR(AMR_states, navigator, logger, start="LM3", target="AP1")
-        logger.info("[Base] Moved back to home.")
+        # move_AMR(AMR_states, navigator, arm_pair, logger, start="LM3", target="AP1")
+        # logger.info("[Base] Moved back to home.")
 
     except Exception as e:
-        logger.info("arm fault in routine")
-        raise Exception("Arm system fault.")
+        # print("fault: " + str(arm_pair.fault()))
+        if arm_pair.fault():
+            raise Exception(f"At least one arm is faulted when running {e}")
+        else:
+            raise Exception(str(e))
     except KeyboardInterrupt:
-        raise KeyboardInterrupt("Routine is canceled")
+        raise KeyboardInterrupt("The routine is canceled.")
 
 
 # execute arm plans
@@ -205,12 +211,15 @@ def execute_arm_plan(plan_names, arm_pair, logger):
         # execute plans by name
         logger.info(f"[Arm] Left Arm: execute {plan_names[0]}")
         logger.info(f"[Arm] Right Arm: execute {plan_names[1]}")
-        arm_pair.ExecutePlan(plan_names, False)
+        arm_pair.ExecutePlan(plan_names, True)
+        time.sleep(1)   # to wait till the arms are in busy state
 
         # print current plans output
-        while arm_pair.busy():
+        while arm_pair.busy() and not stop_event.is_set():
             left_arm_plan_info, right_arm_plan_info = arm_pair.plan_info()
             logger.info(" ")
+            print(f"[Arm] fault state: {str(arm_pair.fault())}")
+            print(f"[Arm] busy state: {str(arm_pair.busy())}")
             print(f"[Arm] left_plan_name: {left_arm_plan_info.assigned_plan_name}")
             print(f"[Arm] left_node_name: {left_arm_plan_info.node_name}")
             # print(f"left_pt_name: {left_arm_plan_info.pt_name}")
@@ -223,22 +232,26 @@ def execute_arm_plan(plan_names, arm_pair, logger):
             # print(f"velocity_scale: {plan_left_arm_plan_infoinfo.velocity_scale}")
             # print(f"waiting_for_step: {left_arm_plan_info.waiting_for_step}")
             print("", flush=True)
-            time.sleep(0.1)
+            time.sleep(1)
     
     # Thread for executing both arms plan
     plans_execute_thread = threading.Thread(target=plans_execute)
     plans_execute_thread.start()
+    time.sleep(1)   # to wait till the arms are in busy state
 
-    # Use main thread to catch keyboard interrupt and exit thread
     try:
         while arm_pair.busy() and not stop_event.is_set():
+            # check if at least one of the arm is in fault. if so both arms are stopped and an Exception will be raised
             if arm_pair.fault():
-                logger.info("arm fault in move")
-                raise Exception("Arm system fault.")
+                arm_pair.StopPlan()
+                stop_event.set()
+                raise Exception(f"\"{plan_names[0]}\" or \"{plan_names[1]}\"")
             time.sleep(0.1)
+    except Exception as e:
+        raise Exception(str(e))
     except KeyboardInterrupt:
         # Send signal to exit thread
-        logger.info("[Arm] Stopping plans execute thread")
+        logger.info("[Arm] Stopping plans from executing the thread")
         stop_event.set()
 
     # Wait for thread to exit
@@ -247,10 +260,11 @@ def execute_arm_plan(plan_names, arm_pair, logger):
 
 
 # move Seer AMR
-def move_AMR(states, navigator, logger, start, target):
+def move_AMR(states, navigator, arm_pair, logger, start, target):
     # set up a non-blocking input exit event for thread interruption
     exit_input = threading.Event()
 
+    logger.info(f"[Base] Movring AMR from {str(start)} to {str(target)}")
     # multi-threading non-blocking user input function
     def non_blocking_input_handler():
         while (navi_states.task_status != 4 or navi_states.task_status != 6) and not exit_input.is_set(): # not finish and not canceled and event is not exited
@@ -258,15 +272,15 @@ def move_AMR(states, navigator, logger, start, target):
                 interruption = sys.stdin.readline().strip()
                 if interruption.lower() == 'p':
                     navigator.pause_current_navigation()
-                    logger.info("[Base] path navigation paused")
+                    print("[Base] path navigation paused")
                 elif interruption.lower() == 'r':
                     navigator.continue_current_navigation()
-                    logger.info("[Base] path navigation resumed")
+                    print("[Base] path navigation resumed")
             else:    
                 time.sleep(0.1)
 
-    logger.info("\'p + ENTER\' to pause the current navigation")
-    logger.info("\'r + ENTER\' to resume .....................")
+    print(f"\'p + ENTER\' to pause the current navigation")
+    print(f"\'r + ENTER\' to resume .....................")
     
     # fixed path navigation
     path = navigator.PathNavigationCommand()
@@ -281,13 +295,19 @@ def move_AMR(states, navigator, logger, start, target):
     input_thread = threading.Thread(target=non_blocking_input_handler)
     input_thread.start()
 
-    logger.info("[Base] navi start status: " + str(navi_states.task_status))
     try:
         while ((navi_states.task_status == 2 or navi_states.task_status != 4) and navi_states.task_status != 6):
-            time.sleep(1)
+            if (arm_pair.fault() == True):
+                navigator.cancel_current_navigation()
+                raise Exception()
+            
             navi_states = states.check_navigation_status()
-            logger.info("[Base] target wp: " + str(navi_states.target_id))
-            logger.info("[Base] navi status: " + str(navi_states.task_status))
+            logger.info(" ")
+            print(f"[Base] navi start status: {str(navi_states.task_status)}")
+            print(f"[Base] target wp: {str(navi_states.target_id)}")
+            print(f"[Base] navi status: {str(navi_states.task_status)}")
+            time.sleep(1)
+
     except KeyboardInterrupt: # use keyboardInterrupt to end the whole program
         navigator.cancel_current_navigation()
         exit_input.set()
@@ -315,7 +335,8 @@ def main():
                     "pick-up": "AICO2_pick-up_",
                     "plug-in": "AICO2_plug-in_",
                     "curl-up": "AICO2_curl-up_",
-                    "wait": "AICO2_wait_"
+                    "wait": "AICO2_wait_",
+                    "fault": "AICO2_fault_"
                 }
     
     try:
