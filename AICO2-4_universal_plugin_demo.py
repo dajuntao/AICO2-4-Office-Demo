@@ -149,16 +149,16 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
         logger.info("[Arm] Reset Arms home pose and Grippers home width.")
         
-        # # move AMR to the universal plug-in station (LM3)
-        # move_AMR(AMR_states, navigator, arm_pair, logger, start="AP1", target="LM3")
-        # logger.info("[Base] Moved to plug-in station.")
+        # move AMR to the universal plug-in station (LM3)
+        move_AMR(AMR_states, navigator, arm_pair, logger, start="AP1", target="LM3")
+        logger.info("[Base] Moved to plug-in station.")
 
         # calibrated work coordinate and synch the new work coordinate in both arms
         execute_arm_plan([arm_plans['work_coord_calib'] + 'L', arm_plans['wait'] + 'R'], arm_pair, logger)
         R_arm.SetGlobalVariables({'workCoord': arm_pair.global_variables()[0]['workCoord']}) # synch the left arm work coordinate with the right arm
         logger.info("[Arm] Work coordinate calibrated and synched.")
 
-        # [testing ]arm pair and AMR fault stop behavior test
+        # [testing] arm pair and AMR fault stop behavior test
         # execute_arm_plan([arm_plans['fault'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
 
         # move arm to transition + pickup BNC
@@ -178,8 +178,8 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         logger.info("[Arm] Reset Arms home pose and Grippers home width.")
 
         # move AMR back to home (AP1)
-        # move_AMR(AMR_states, navigator, arm_pair, logger, start="LM3", target="AP1")
-        # logger.info("[Base] Moved back to home.")
+        move_AMR(AMR_states, navigator, arm_pair, logger, start="LM3", target="AP1")
+        logger.info("[Base] Moved back to home.")
 
     except Exception as e:
         # print("fault: " + str(arm_pair.fault()))
@@ -188,7 +188,8 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         else:
             raise Exception(str(e))
     except KeyboardInterrupt:
-        raise KeyboardInterrupt("The routine is canceled.")
+        arm_pair.StopPlan()
+        raise KeyboardInterrupt("The routine is canceled")
 
 
 # execute arm plans
@@ -211,13 +212,14 @@ def execute_arm_plan(plan_names, arm_pair, logger):
         # execute plans by name
         logger.info(f"[Arm] Left Arm: execute {plan_names[0]}")
         logger.info(f"[Arm] Right Arm: execute {plan_names[1]}")
-        arm_pair.ExecutePlan(plan_names, True)
-        time.sleep(1)   # to wait till the arms are in busy state
+        arm_pair.ExecutePlan(plan_names, False)
 
+        # try: 
         # print current plans output
-        while arm_pair.busy() and not stop_event.is_set():
+        while arm_pair.busy() :
             left_arm_plan_info, right_arm_plan_info = arm_pair.plan_info()
             logger.info(" ")
+            print(f"[Arm] event state: {str(stop_event.is_set())}")
             print(f"[Arm] fault state: {str(arm_pair.fault())}")
             print(f"[Arm] busy state: {str(arm_pair.busy())}")
             print(f"[Arm] left_plan_name: {left_arm_plan_info.assigned_plan_name}")
@@ -232,29 +234,31 @@ def execute_arm_plan(plan_names, arm_pair, logger):
             # print(f"velocity_scale: {plan_left_arm_plan_infoinfo.velocity_scale}")
             # print(f"waiting_for_step: {left_arm_plan_info.waiting_for_step}")
             print("", flush=True)
-            time.sleep(1)
-    
+            time.sleep(0.1)
+        # except KeyboardInterrupt:
+        #     raise KeyboardInterrupt
+        
     # Thread for executing both arms plan
     plans_execute_thread = threading.Thread(target=plans_execute)
     plans_execute_thread.start()
     time.sleep(1)   # to wait till the arms are in busy state
 
-    try:
-        while arm_pair.busy() and not stop_event.is_set():
-            # check if at least one of the arm is in fault. if so both arms are stopped and an Exception will be raised
-            if arm_pair.fault():
-                arm_pair.StopPlan()
-                stop_event.set()
-                raise Exception(f"\"{plan_names[0]}\" or \"{plan_names[1]}\"")
-            time.sleep(0.1)
-    except Exception as e:
-        raise Exception(str(e))
-    except KeyboardInterrupt:
-        # Send signal to exit thread
-        logger.info("[Arm] Stopping plans from executing the thread")
-        stop_event.set()
+    # try:
+    while arm_pair.busy() and not stop_event.is_set():
+        # check if at least one of the arm is in fault. if so both arms are stopped and an Exception will be raised
+        if arm_pair.fault():
+            arm_pair.StopPlan()
+            stop_event.set()
+            raise Exception(f"\"{plan_names[0]}\" or \"{plan_names[1]}\"")
+        time.sleep(0.1)
+    # except KeyboardInterrupt:
+    #     # Send signal to exit thread
+    #     logger.error("[Arm] Stopping plans from executing the thread")
+    #     stop_event.set()
+    #     raise KeyboardInterrupt
 
     # Wait for thread to exit
+    stop_event.set()
     plans_execute_thread.join()
     logger.info("[Arm] Plans execute thread exited")
 
@@ -279,8 +283,10 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
             else:    
                 time.sleep(0.1)
 
+    logger.info(" ")
     print(f"\'p + ENTER\' to pause the current navigation")
     print(f"\'r + ENTER\' to resume .....................")
+    print("", flush=True)
     
     # fixed path navigation
     path = navigator.PathNavigationCommand()
@@ -303,9 +309,10 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
             
             navi_states = states.check_navigation_status()
             logger.info(" ")
-            print(f"[Base] navi start status: {str(navi_states.task_status)}")
+            # print(f"[Base] navi start status: {str(navi_states.task_status)}")
             print(f"[Base] target wp: {str(navi_states.target_id)}")
             print(f"[Base] navi status: {str(navi_states.task_status)}")
+            print("", flush=True)
             time.sleep(1)
 
     except KeyboardInterrupt: # use keyboardInterrupt to end the whole program
@@ -341,10 +348,10 @@ def main():
     
     try:
         logger = spdlog.ConsoleLogger("AICO2 Universal Plug-in Demo")
-        robot_pair, AMR_states, navigator = sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger)
+        arm_pair, AMR_states, navigator = sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger)
 
         # run AICO2 demo routines
-        execute_routines(robot_pair, AMR_states, navigator, arm_plans, logger)
+        execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger)
 
     except Exception as e:
         logger.error(str(e))
