@@ -24,6 +24,6 @@ under /flexivamr_lib_py
 
 ## Linux Desktop Executable
 
-1. Drag the executable file to Linux desktop.
-2. Change the path and the python project directory according to the "AICO2-4-Office-Demo" directory.
-3. Right-click the executable to enable "Allow Launching".
+1. Drag the .desktop file to desktop.
+2. Change the path and the python project directory according to the actual "AICO2-4-Office-Demo" directory.
+3. Right-click the .desktop to enable "Allow Launching".
