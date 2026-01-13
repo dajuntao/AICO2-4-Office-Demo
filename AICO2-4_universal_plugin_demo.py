@@ -21,8 +21,20 @@ import flexivamr
 
 # connect and initialize arm and AMR
 def sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger):
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - - - -")
+    logger.info("- - - - - - - START SYSTEM INITIALIZATION - - - - - - -")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - - - -\n")
+
+    logger.info("- - - - - - - - - Arm initialization - - - - - - - - - ")
     arm_pair = connect_arm_pair(arm_L_sn, arm_R_sn, logger)
+    print("", flush=True)
+
+    logger.info("- - - - - - - - - Base initialization - - - - - - - - -")
     AMR_states, navigator = connect_AMR(AMR_ip, logger)
+    logger.info("[Base] AMR is initialized.\n")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - -")
+    logger.info("- - - - - - - SYSTEM IS INITIALIZED - - - - - - -")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - -\n")
 
     return arm_pair, AMR_states, navigator
 
@@ -106,9 +118,9 @@ def init_AMR(states, control, configure, logger):
     # check if amr states::control is seized
     bool_control = states.is_control_seized()
     if bool_control:
-        logger.info("[Base] states::control is seized")
+        logger.info("[Base] control state is seized")
     else:
-        logger.warn("[Base] states::control is not seized")
+        logger.warn("[Base] control state is not seized")
     
     # clear faults
     #configure.clear_errors(name)
@@ -137,6 +149,10 @@ def init_AMR(states, control, configure, logger):
 
 # execute routines with arm plans and move Seer AMR
 def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - ")
+    logger.info("- - - - - - - START RUNNING ROUTINES - - - - - - -")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - -\n")
+    
     try:
         # create two instances for both arms
         L_arm, R_arm = arm_pair.instances()
@@ -158,8 +174,10 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         R_arm.SetGlobalVariables({'workCoord': arm_pair.global_variables()[0]['workCoord']}) # synch the left arm work coordinate with the right arm
         logger.info("[Arm] Work coordinate calibrated and synched.")
 
+        ################################################################################################
         # [testing] arm pair and AMR fault stop behavior test
         # execute_arm_plan([arm_plans['fault'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
+        ################################################################################################
 
         # move arm to transition + pickup BNC
         execute_arm_plan([arm_plans['transition_coord'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
@@ -175,21 +193,25 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
 
         # move arm to the home pose and reset gripper width
         execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
-        logger.info("[Arm] Reset Arms home pose and Grippers home width.")
+        # logger.info("[Arm] Reset Arms home pose and Grippers home width.")
 
         # move AMR back to home (AP1)
         move_AMR(AMR_states, navigator, arm_pair, logger, start="LM3", target="AP1")
         logger.info("[Base] Moved back to home.")
 
     except Exception as e:
-        # print("fault: " + str(arm_pair.fault()))
         if arm_pair.fault():
             raise Exception(f"At least one arm is faulted when running {e}")
         else:
             raise Exception(str(e))
     except KeyboardInterrupt:
         arm_pair.StopPlan()
-        raise KeyboardInterrupt("The routine is canceled")
+        raise KeyboardInterrupt("The routine is canceled by the user.")
+    
+    print("", flush=True)
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - -")
+    logger.info("- - - - - - - ROUTINES ARE FINISHED - - - - - - -")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - -")
 
 
 # execute arm plans
@@ -211,10 +233,9 @@ def execute_arm_plan(plan_names, arm_pair, logger):
 
         # execute plans by name
         logger.info(f"[Arm] Left Arm: execute {plan_names[0]}")
-        logger.info(f"[Arm] Right Arm: execute {plan_names[1]}")
+        logger.info(f"[Arm] Right Arm: execute {plan_names[1]}\n")
         arm_pair.ExecutePlan(plan_names, False)
 
-        # try: 
         # print current plans output
         while arm_pair.busy() :
             left_arm_plan_info, right_arm_plan_info = arm_pair.plan_info()
@@ -235,8 +256,6 @@ def execute_arm_plan(plan_names, arm_pair, logger):
             # print(f"waiting_for_step: {left_arm_plan_info.waiting_for_step}")
             print("", flush=True)
             time.sleep(0.1)
-        # except KeyboardInterrupt:
-        #     raise KeyboardInterrupt
         
     # Thread for executing both arms plan
     plans_execute_thread = threading.Thread(target=plans_execute)
@@ -260,7 +279,6 @@ def execute_arm_plan(plan_names, arm_pair, logger):
     # Wait for thread to exit
     stop_event.set()
     plans_execute_thread.join()
-    logger.info("[Arm] Plans execute thread exited")
 
 
 # move Seer AMR
@@ -283,10 +301,8 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
             else:    
                 time.sleep(0.1)
 
-    logger.info(" ")
-    print(f"\'p + ENTER\' to pause the current navigation")
-    print(f"\'r + ENTER\' to resume .....................")
-    print("", flush=True)
+    print(f"\n\'p + ENTER\' to pause the current navigation")
+    print(f"\'r + ENTER\' to resume .....................\n")
     
     # fixed path navigation
     path = navigator.PathNavigationCommand()
@@ -309,7 +325,6 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
             
             navi_states = states.check_navigation_status()
             logger.info(" ")
-            # print(f"[Base] navi start status: {str(navi_states.task_status)}")
             print(f"[Base] target wp: {str(navi_states.target_id)}")
             print(f"[Base] navi status: {str(navi_states.task_status)}")
             print("", flush=True)
@@ -356,7 +371,7 @@ def main():
     except Exception as e:
         logger.error(str(e))
     except KeyboardInterrupt as e:
-        logger.error(str(e) + " by the user.")
+        logger.error(str(e))
 
 
 if __name__ == "__main__":
