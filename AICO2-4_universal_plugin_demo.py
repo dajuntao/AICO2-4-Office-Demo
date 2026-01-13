@@ -21,20 +21,20 @@ import flexivamr
 
 # connect and initialize arm and AMR
 def sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger):
-    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - - - -")
-    logger.info("- - - - - - - START SYSTEM INITIALIZATION - - - - - - -")
-    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - - - -\n")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
+    logger.info("- - - - - - START SYSTEM INITIALIZATION - - - - - -")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -\n")
 
-    logger.info("- - - - - - - - - Arm initialization - - - - - - - - - ")
+    logger.info("- - - - - - - - Arm initialization - - - - - - - -")
     arm_pair = connect_arm_pair(arm_L_sn, arm_R_sn, logger)
     print("", flush=True)
 
-    logger.info("- - - - - - - - - Base initialization - - - - - - - - -")
+    logger.info("- - - - - - - - Base initialization - - - - - - - -")
     AMR_states, navigator = connect_AMR(AMR_ip, logger)
     logger.info("[Base] AMR is initialized.\n")
-    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - -")
-    logger.info("- - - - - - - SYSTEM IS INITIALIZED - - - - - - -")
-    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - -\n")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
+    logger.info("- - - - - - - SYSTEM IS INITIALIZED - - - - - - - -")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -\n")
 
     return arm_pair, AMR_states, navigator
 
@@ -149,9 +149,9 @@ def init_AMR(states, control, configure, logger):
 
 # execute routines with arm plans and move Seer AMR
 def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
-    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - ")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
     logger.info("- - - - - - - START RUNNING ROUTINES - - - - - - -")
-    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - -\n")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -\n")
     
     try:
         # create two instances for both arms
