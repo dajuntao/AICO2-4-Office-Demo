@@ -25,11 +25,11 @@ def sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger):
     logger.info("- - - - - - START SYSTEM INITIALIZATION - - - - - -")
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -\n")
 
-    logger.info("- - - - - - - - Arm initialization - - - - - - - -")
+    logger.info("- - - - - - - - ARM INITIALIZATION  - - - - - - - -")
     arm_pair = connect_arm_pair(arm_L_sn, arm_R_sn, logger)
     print("", flush=True)
 
-    logger.info("- - - - - - - - Base initialization - - - - - - - -")
+    logger.info("- - - - - - - - BASE INITIALIZATION - - - - - - - -")
     AMR_states, navigator = connect_AMR(AMR_ip, logger)
     logger.info("[Base] AMR is initialized.\n")
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
@@ -122,7 +122,7 @@ def init_AMR(states, control, configure, logger):
     else:
         logger.warn("[Base] control state is not seized")
     
-    # clear faults
+    # clear faults [not implemented]
     #configure.clear_errors(name)
 
     # check relocation
@@ -150,7 +150,7 @@ def init_AMR(states, control, configure, logger):
 # execute routines with arm plans and move Seer AMR
 def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
-    logger.info("- - - - - - - START RUNNING ROUTINES - - - - - - -")
+    logger.info("- - - - - - - START RUNNING ROUTINES  - - - - - - -")
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -\n")
     
     try:
@@ -174,8 +174,7 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         R_arm.SetGlobalVariables({'workCoord': arm_pair.global_variables()[0]['workCoord']}) # synch the left arm work coordinate with the right arm
         logger.info("[Arm] Work coordinate calibrated and synched.")
 
-        ################################################################################################
-        # [testing] arm pair and AMR fault stop behavior test
+        ##################### [testing] arm pair and AMR fault stop behavior test ######################
         # execute_arm_plan([arm_plans['fault'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
         ################################################################################################
 
@@ -240,9 +239,9 @@ def execute_arm_plan(plan_names, arm_pair, logger):
         while arm_pair.busy() :
             left_arm_plan_info, right_arm_plan_info = arm_pair.plan_info()
             logger.info(" ")
-            print(f"[Arm] event state: {str(stop_event.is_set())}")
-            print(f"[Arm] fault state: {str(arm_pair.fault())}")
-            print(f"[Arm] busy state: {str(arm_pair.busy())}")
+            # print(f"[Arm] event state: {str(stop_event.iss_set())}")
+            # print(f"[Arm] fault state: {str(arm_pair.fault())}")
+            # print(f"[Arm] busy state: {str(arm_pair.busy())}")
             print(f"[Arm] left_plan_name: {left_arm_plan_info.assigned_plan_name}")
             print(f"[Arm] left_node_name: {left_arm_plan_info.node_name}")
             # print(f"left_pt_name: {left_arm_plan_info.pt_name}")
@@ -294,15 +293,12 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
                 interruption = sys.stdin.readline().strip()
                 if interruption.lower() == 'p':
                     navigator.pause_current_navigation()
-                    print("[Base] path navigation paused")
+                    print("[Base] path navigation paused.")
                 elif interruption.lower() == 'r':
                     navigator.continue_current_navigation()
-                    print("[Base] path navigation resumed")
+                    print("[Base] path navigation resumed.s")
             else:    
                 time.sleep(0.1)
-
-    print(f"\n\'p + ENTER\' to pause the current navigation")
-    print(f"\'r + ENTER\' to resume .....................\n")
     
     # fixed path navigation
     path = navigator.PathNavigationCommand()
@@ -325,6 +321,8 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
             
             navi_states = states.check_navigation_status()
             logger.info(" ")
+            print(f"[Base] \'p + ENTER\' to pause")
+            print(f"[Base] \'r + ENTER\' to resume")
             print(f"[Base] target wp: {str(navi_states.target_id)}")
             print(f"[Base] navi status: {str(navi_states.task_status)}")
             print("", flush=True)
