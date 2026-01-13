@@ -254,7 +254,7 @@ def execute_arm_plan(plan_names, arm_pair, logger):
     # Thread for executing both arms plan
     plans_execute_thread = threading.Thread(target=plans_execute)
     plans_execute_thread.start()
-    time.sleep(1)   # to wait till the arms are in busy state
+    time.sleep(0.1)   # to wait till the arms are in busy state
 
     while arm_pair.busy() and not stop_event.is_set():
         # check if at least one of the arm is in fault. if so both arms are stopped and an Exception will be raised
@@ -328,9 +328,6 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
 
 # caller function
 def main():
-    # Create an event to signal the thread to stop
-    stop_event = threading.Event()
-
     arm_L_sn = "Rizon4-063048"
     arm_R_sn = "Rizon4R-062059"
     AMR_ip = "192.168.1.110"
