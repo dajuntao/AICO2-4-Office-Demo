@@ -170,12 +170,12 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         logger.info("[Base] Moved to plug-in station.")
 
         # calibrated work coordinate and synch the new work coordinate in both arms
-        execute_arm_plan([arm_plans['work_coord_calib'] + 'L', arm_plans['wait'] + 'R'], arm_pair, logger)
+        # execute_arm_plan([arm_plans['work_coord_calib'] + 'L', arm_plans['wait'] + 'R'], arm_pair, logger)
         R_arm.SetGlobalVariables({'workCoord': arm_pair.global_variables()[0]['workCoord']}) # synch the left arm work coordinate with the right arm
         logger.info("[Arm] Work coordinate calibrated and synched.")
 
         ##################### [testing] arm pair and AMR fault stop behavior test ######################
-        # execute_arm_plan([arm_plans['fault'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
+        execute_arm_plan([arm_plans['fault'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
         ################################################################################################
 
         # move arm to transition + pickup BNC
@@ -236,7 +236,7 @@ def execute_arm_plan(plan_names, arm_pair, logger):
         arm_pair.ExecutePlan(plan_names, False)
 
         # print current plans output
-        while arm_pair.busy() :
+        while arm_pair.busy() and not stop_event.is_set() and not arm_pair.fault():
             left_arm_plan_info, right_arm_plan_info = arm_pair.plan_info()
             logger.info(" ")
             # print(f"[Arm] event state: {str(stop_event.iss_set())}")
@@ -256,7 +256,6 @@ def execute_arm_plan(plan_names, arm_pair, logger):
     plans_execute_thread.start()
     time.sleep(1)   # to wait till the arms are in busy state
 
-    # try:
     while arm_pair.busy() and not stop_event.is_set():
         # check if at least one of the arm is in fault. if so both arms are stopped and an Exception will be raised
         if arm_pair.fault():
@@ -264,14 +263,8 @@ def execute_arm_plan(plan_names, arm_pair, logger):
             stop_event.set()
             raise Exception(f"\"{plan_names[0]}\" or \"{plan_names[1]}\"")
         time.sleep(0.1)
-    # except KeyboardInterrupt:
-    #     # Send signal to exit thread
-    #     logger.error("[Arm] Stopping plans from executing the thread")
-    #     stop_event.set()
-    #     raise KeyboardInterrupt
 
     # Wait for thread to exit
-    stop_event.set()
     plans_execute_thread.join()
 
 
