@@ -273,7 +273,7 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
     # set up a non-blocking input exit event for thread interruption
     exit_input = threading.Event()
 
-    logger.info(f"[Base] Movring AMR from {str(start)} to {str(target)}")
+    logger.info(f"[Base] Movring AMR from {str(start)} to {str(target)}\n")
     # multi-threading non-blocking user input function
     def non_blocking_input_handler():
         while (navi_states.task_status != 4 or navi_states.task_status != 6) and not exit_input.is_set(): # not finish and not canceled and event is not exited
