@@ -29,6 +29,9 @@ def sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger):
     arm_pair = connect_arm_pair(arm_L_sn, arm_R_sn, logger)
     print("", flush=True)
 
+    # logger.info("- - - - - - - GRIPPERS INITIALIZATION - - - - - - -")
+    # gripper_pair = init_gripper(arm_pair, logger)
+
     logger.info("- - - - - - - - Base initialization - - - - - - - -")
     AMR_states, navigator = connect_AMR(AMR_ip, logger)
     logger.info("[Base] AMR is initialized.\n")
@@ -65,6 +68,25 @@ def connect_arm_pair(arm_L_sn, arm_R_sn, logger):
     logger.info("[Arm] Both arms are now operational")
 
     return arm_pair
+
+
+def init_gripper(arm_pair, logger):
+    L_arm, R_arm = arm_pair.instances()
+    L_gripper = flexivrdk.Device(L_arm)
+    R_gripper = flexivrdk.Device(R_arm)
+
+    print(L_gripper.params("Flexiv-GN01"))
+
+    gripper_pair = flexivdrdk.GripperPair(arm_pair)
+
+    # enable gripper (TCP) on two arms (use the gripper name in "Tool" Settings)
+    gripper_pair.Enable(["Flexiv-GN01", "Flexiv-GN01"])
+    # initialize two grippers
+    gripper_pair.Init()
+    time.sleep(10)
+    logger.info("[Gripper] Both grippers are now initialized")
+
+    return gripper_pair
 
 
 # initialize Seer AMR API
