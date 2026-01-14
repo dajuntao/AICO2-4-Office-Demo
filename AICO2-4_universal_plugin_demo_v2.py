@@ -29,8 +29,8 @@ def sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger):
     arm_pair = connect_arm_pair(arm_L_sn, arm_R_sn, logger)
     print("", flush=True)
 
-    # logger.info("- - - - - - - GRIPPERS INITIALIZATION - - - - - - -")
-    # gripper_pair = init_gripper(arm_pair, logger)
+    logger.info("- - - - - - - GRIPPERS INITIALIZATION - - - - - - -")
+    gripper_pair = init_gripper(arm_pair, logger)
 
     logger.info("- - - - - - - - Base initialization - - - - - - - -")
     AMR_states, navigator = connect_AMR(AMR_ip, logger)
@@ -75,9 +75,12 @@ def init_gripper(arm_pair, logger):
     L_gripper = flexivrdk.Device(L_arm)
     R_gripper = flexivrdk.Device(R_arm)
 
-    print(L_gripper.params("Flexiv-GN01"))
+    # print(L_gripper.params("Flexiv-GN01"))
 
     gripper_pair = flexivdrdk.GripperPair(arm_pair)
+    # L_g, R_g = gripper_pair.params()
+    # print(gripper_pair.params(["Flexiv-GN01", "Flexiv-GN01"]))
+    # print(L_g)
 
     # enable gripper (TCP) on two arms (use the gripper name in "Tool" Settings)
     gripper_pair.Enable(["Flexiv-GN01", "Flexiv-GN01"])
@@ -385,7 +388,7 @@ def main():
         arm_pair, AMR_states, navigator = sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger)
 
         # run AICO2 demo routines
-        execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger)
+        # execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger)
 
     except Exception as e:
         logger.error(str(e))
