@@ -25,13 +25,13 @@ def sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger):
     logger.info("- - - - - - START SYSTEM INITIALIZATION - - - - - -")
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -\n")
 
-    logger.info("- - - - - - - - ARM INITIALIZATION  - - - - - - - -")
+    logger.info("- - - - - - - ARMS INITIALIZATION - - - - - - - - -\n")
     arm_pair = connect_arm_pair(arm_L_sn, arm_R_sn, logger)
-    print("", flush=True)
 
     logger.info("- - - - - - - - BASE INITIALIZATION - - - - - - - -")
     AMR_states, navigator = connect_AMR(AMR_ip, logger)
     logger.info("[Base] AMR is initialized.\n")
+
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
     logger.info("- - - - - - - SYSTEM IS INITIALIZED - - - - - - - -")
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -\n")
@@ -170,12 +170,12 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         logger.info("[Base] Moved to plug-in station.")
 
         # calibrated work coordinate and synch the new work coordinate in both arms
-        # execute_arm_plan([arm_plans['work_coord_calib'] + 'L', arm_plans['wait'] + 'R'], arm_pair, logger)
+        execute_arm_plan([arm_plans['work_coord_calib'] + 'L', arm_plans['wait'] + 'R'], arm_pair, logger)
         R_arm.SetGlobalVariables({'workCoord': arm_pair.global_variables()[0]['workCoord']}) # synch the left arm work coordinate with the right arm
         logger.info("[Arm] Work coordinate calibrated and synched.")
 
         ##################### [testing] arm pair and AMR fault stop behavior test ######################
-        execute_arm_plan([arm_plans['fault'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
+        # execute_arm_plan([arm_plans['fault'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
         ################################################################################################
 
         # move arm to transition + pickup BNC
@@ -192,7 +192,7 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
 
         # move arm to the home pose and reset gripper width
         execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
-        # logger.info("[Arm] Reset Arms home pose and Grippers home width.")
+        logger.info("[Arm] Reset Arms home pose and Grippers home width.")
 
         # move AMR back to home (AP1)
         move_AMR(AMR_states, navigator, arm_pair, logger, start="LM3", target="AP1")
