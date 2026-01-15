@@ -2,9 +2,9 @@
 
 ## Firmware Compatibility
 
-| **RDK**       | **Robot Firmware** |
-| ------------- | ------------------ |
-| v1.9          | v3.10.3            |
+| **DRDK**      | **RDK**       | **Robot Firmware** |
+| ------------- | ------------- | ------------------ |
+| v1.1          | v1.9          | v3.10.3            |
 
 ## Environment Compatibility
 
