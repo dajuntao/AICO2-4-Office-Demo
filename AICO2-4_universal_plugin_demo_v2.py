@@ -29,9 +29,6 @@ def sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger):
     arm_pair = connect_arm_pair(arm_L_sn, arm_R_sn, logger)
     print("", flush=True)
 
-    logger.info("- - - - - - - GRIPPERS INITIALIZATION - - - - - - -")
-    gripper_pair = init_gripper(arm_pair, logger)
-
     logger.info("- - - - - - - - Base initialization - - - - - - - -")
     AMR_states, navigator = connect_AMR(AMR_ip, logger)
     logger.info("[Base] AMR is initialized.\n")
@@ -56,6 +53,9 @@ def connect_arm_pair(arm_L_sn, arm_R_sn, logger):
             logger.error("[Arm] Fault cannot be cleared, exiting ...")
             return 1
         logger.info("[Arm] Fault on the connected arm is cleared")
+    
+    # check if the arms were operational already
+    was_operational = arm_pair.operational()
 
     # Enable the pair of robots, make sure the E-stop is released before enabling
     logger.info("[Arm] Enabling arms ...")
@@ -64,32 +64,24 @@ def connect_arm_pair(arm_L_sn, arm_R_sn, logger):
     # Wait for the arm to become operational
     while not arm_pair.operational():
         time.sleep(1)
+    logger.info("[Arm] Both arms are now operational\n")
 
-    logger.info("[Arm] Both arms are now operational")
+    logger.info("- - - - - - - GRIPPERS INITIALIZATION - - - - - - -")
+    # if the arms were not operational already, initialize grippers
+    if not was_operational:
+        logger.info("[Gripper] Initializing grippers ...")
+        init_gripper(arm_pair, logger)
+    logger.info("[Gripper] Both grippers are now initialized")
 
     return arm_pair
 
 
-def init_gripper(arm_pair, logger):
-    L_arm, R_arm = arm_pair.instances()
-    L_gripper = flexivrdk.Device(L_arm)
-    R_gripper = flexivrdk.Device(R_arm)
-
-    # print(L_gripper.params("Flexiv-GN01"))
-
+# initialize grippers
+def init_gripper(arm_pair, logger): 
     gripper_pair = flexivdrdk.GripperPair(arm_pair)
-    # L_g, R_g = gripper_pair.params()
-    # print(gripper_pair.params(["Flexiv-GN01", "Flexiv-GN01"]))
-    # print(L_g)
-
-    # enable gripper (TCP) on two arms (use the gripper name in "Tool" Settings)
     gripper_pair.Enable(["Flexiv-GN01", "Flexiv-GN01"])
-    # initialize two grippers
     gripper_pair.Init()
     time.sleep(10)
-    logger.info("[Gripper] Both grippers are now initialized")
-
-    return gripper_pair
 
 
 # initialize Seer AMR API
@@ -183,8 +175,8 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         L_arm, R_arm = arm_pair.instances()
 
         # initialize gripper
-        execute_arm_plan([arm_plans['gripper_init'] + 'L', arm_plans['gripper_init'] + 'R'], arm_pair, logger)
-        logger.info("[Arm] Both Grippers are initialized.")
+        # execute_arm_plan([arm_plans['gripper_init'] + 'L', arm_plans['gripper_init'] + 'R'], arm_pair, logger)
+        # logger.info("[Arm] Both Grippers are initialized.")
 
         # move arm to the home pose and reset gripper width
         execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)

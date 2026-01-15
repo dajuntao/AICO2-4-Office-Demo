@@ -23,18 +23,22 @@ import flexivamr
 def sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger):
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
     logger.info("- - - - - - START SYSTEM INITIALIZATION - - - - - -")
-    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -\n")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
+    logger.info("")
 
-    logger.info("- - - - - - - ARMS INITIALIZATION - - - - - - - - -\n")
+    logger.info("- - - - - - - ARMS INITIALIZATION - - - - - - - - -")
     arm_pair = connect_arm_pair(arm_L_sn, arm_R_sn, logger)
+    logger.info("")
 
     logger.info("- - - - - - - - BASE INITIALIZATION - - - - - - - -")
     AMR_states, navigator = connect_AMR(AMR_ip, logger)
-    logger.info("[Base] AMR is initialized.\n")
+    logger.info("[Base] AMR is initialized.")
+    logger.info("")
 
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
     logger.info("- - - - - - - SYSTEM IS INITIALIZED - - - - - - - -")
-    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -\n")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
+    logger.info("")
 
     return arm_pair, AMR_states, navigator
 
@@ -54,6 +58,9 @@ def connect_arm_pair(arm_L_sn, arm_R_sn, logger):
             return 1
         logger.info("[Arm] Fault on the connected arm is cleared")
 
+    # check if the arms were operational already
+    was_operational = arm_pair.operational()
+
     # Enable the pair of robots, make sure the E-stop is released before enabling
     logger.info("[Arm] Enabling arms ...")
     arm_pair.Enable()
@@ -61,41 +68,55 @@ def connect_arm_pair(arm_L_sn, arm_R_sn, logger):
     # Wait for the arm to become operational
     while not arm_pair.operational():
         time.sleep(1)
+    logger.info("[Arm] Both arms are now operational\n")
 
-    logger.info("[Arm] Both arms are now operational")
+    logger.info("- - - - - - - GRIPPERS INITIALIZATION - - - - - - -")
+    # if the arms were not operational already, initialize grippers
+    if not was_operational:
+        logger.info("[Gripper] Initializing grippers ...")
+        init_gripper(arm_pair, logger)
+    logger.info("[Gripper] Both grippers are now initialized")
 
     return arm_pair
+
+
+# initialize grippers
+def init_gripper(arm_pair, logger): 
+    gripper_pair = flexivdrdk.GripperPair(arm_pair)
+    gripper_pair.Enable(["Flexiv-GN01", "Flexiv-GN01"])
+    gripper_pair.Init()
+    time.sleep(11)
 
 
 # initialize Seer AMR API
 def connect_AMR(AMR_ip, logger):
     AMR_states = flexivamr.StatesAPI()
     if (not AMR_states.connect(AMR_ip)):
-        logger.warn("[Base] states failed to connect")
+        logger.warn("[Base] States failed to connect")
         return 1
     else:
-        logger.info("[Base] states connected successfully")
+        logger.info("[Base] States connected successfully")
 
     navigator = flexivamr.NavigatorAPI()
     if (not navigator.connect(AMR_ip)):
-        logger.warn("[Base] navigator failed to connect")
+        logger.warn("[Base] Navigator failed to connect")
         return 1
     else:
-        logger.info("[Base] navigator connected successfully")
+        logger.info("[Base] Navigator connected successfully")
 
     control = flexivamr.ControlAPI()
     if (not control.connect(AMR_ip)):
-        logger.warn("[Base] control failed to connect")
+        logger.warn("[Base] Control failed to connect")
         return 1
     else:
-        logger.info("[Base] control connected successfully")
+        logger.info("[Base] Control connected successfully")
 
     configure = flexivamr.ConfigureAPI()
     if (not configure.connect(AMR_ip)):
-        logger.warn("[Base] configure failed to connect")
+        logger.warn("[Base] Configure failed to connect")
         return 1
     else:
-        logger.info("[Base] configure connected successfully")
+        logger.info("[Base] Configure connected successfully")
 
     # seize AMR control and check relocation
     init_AMR(AMR_states, control, configure, logger)
@@ -111,16 +132,16 @@ def init_AMR(states, control, configure, logger):
     # gain control over amr
     bool_control = configure.gain_control(name)
     if bool_control:
-        logger.info("[Base] control seized successfully")
+        logger.info("[Base] Control seized successfully")
     else:
-        logger.warn("[Base] control failed to seize")
+        logger.warn("[Base] Control failed to seize")
     
     # check if amr states::control is seized
     bool_control = states.is_control_seized()
     if bool_control:
-        logger.info("[Base] control state is seized")
+        logger.info("[Base] Control state is seized")
     else:
-        logger.warn("[Base] control state is not seized")
+        logger.warn("[Base] Control state is not seized")
     
     # clear faults [not implemented]
     #configure.clear_errors(name)
@@ -158,21 +179,24 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         L_arm, R_arm = arm_pair.instances()
 
         # initialize gripper
-        execute_arm_plan([arm_plans['gripper_init'] + 'L', arm_plans['gripper_init'] + 'R'], arm_pair, logger)
-        logger.info("[Arm] Both Grippers are initialized.")
+        # execute_arm_plan([arm_plans['gripper_init'] + 'L', arm_plans['gripper_init'] + 'R'], arm_pair, logger)
+        # logger.info("[Arm] Both Grippers are initialized.\n")
 
         # move arm to the home pose and reset gripper width
         execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
         logger.info("[Arm] Reset Arms home pose and Grippers home width.")
+        logger.info("")
         
         # move AMR to the universal plug-in station (LM3)
         move_AMR(AMR_states, navigator, arm_pair, logger, start="AP1", target="LM3")
         logger.info("[Base] Moved to plug-in station.")
+        logger.info("")
 
         # calibrated work coordinate and synch the new work coordinate in both arms
         execute_arm_plan([arm_plans['work_coord_calib'] + 'L', arm_plans['wait'] + 'R'], arm_pair, logger)
         R_arm.SetGlobalVariables({'workCoord': arm_pair.global_variables()[0]['workCoord']}) # synch the left arm work coordinate with the right arm
         logger.info("[Arm] Work coordinate calibrated and synched.")
+        logger.info("")
 
         ##################### [testing] arm pair and AMR fault stop behavior test ######################
         # execute_arm_plan([arm_plans['fault'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
@@ -181,18 +205,22 @@ def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
         # move arm to transition + pickup BNC
         execute_arm_plan([arm_plans['transition_coord'] + 'L', arm_plans['pick-up'] + 'BNC_R'], arm_pair, logger)
         logger.info("[Arm] Moved Left arm to transition pose and the right arm pick up BNC.")
+        logger.info("")
 
         # move arm to pickup 500v + curl
         execute_arm_plan([arm_plans['pick-up'] + '500v_L', arm_plans['curl-up'] + 'R'], arm_pair, logger)
         logger.info("[Arm] Moved Left arm to pickup the 500v connector pose and the right arm curled-up to clear obstacles.")
+        logger.info("")
 
         # move to plug-in + plug-in
         execute_arm_plan([arm_plans['plug-in'] + '500v_L', arm_plans['plug-in'] + 'BNC_R'], arm_pair, logger)
         logger.info("[Arm] Moved Left arm to plug in the 500v connector pose and the right arm pluged-in to BNC.")
+        logger.info("")
 
         # move arm to the home pose and reset gripper width
         execute_arm_plan([arm_plans['arm_homing'] + 'L', arm_plans['arm_homing'] + 'R'], arm_pair, logger)
         logger.info("[Arm] Reset Arms home pose and Grippers home width.")
+        logger.info("")
 
         # move AMR back to home (AP1)
         move_AMR(AMR_states, navigator, arm_pair, logger, start="LM3", target="AP1")
@@ -227,12 +255,12 @@ def execute_arm_plan(plan_names, arm_pair, logger):
             except:
                 arm_pair.SwitchMode(flexivrdk.Mode.NRT_PLAN_EXECUTION)
             else:
-                logger.info("[Arm] The arm is switched to the PLAN_EXECUTION mode.")
+                # logger.info("[Arm] The arm is switched to the PLAN_EXECUTION mode.")
                 break
 
         # execute plans by name
         logger.info(f"[Arm] Left Arm: execute {plan_names[0]}")
-        logger.info(f"[Arm] Right Arm: execute {plan_names[1]}\n")
+        logger.info(f"[Arm] Right Arm: execute {plan_names[1]}")
         arm_pair.ExecutePlan(plan_names, False)
 
         # print current plans output
@@ -249,7 +277,7 @@ def execute_arm_plan(plan_names, arm_pair, logger):
             print(f"[Arm] right_pt_name: {right_arm_plan_info.pt_name}")
             print(f"[Arm] right_node_name: {right_arm_plan_info.node_name}")
             print("", flush=True)
-            time.sleep(0.1)
+            time.sleep(1)
         
     # Thread for executing both arms plan
     plans_execute_thread = threading.Thread(target=plans_execute)
@@ -273,7 +301,7 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
     # set up a non-blocking input exit event for thread interruption
     exit_input = threading.Event()
 
-    logger.info(f"[Base] Movring AMR from {str(start)} to {str(target)}\n")
+    logger.info(f"[Base] Moving AMR from {str(start)} to {str(target)}")
     # multi-threading non-blocking user input function
     def non_blocking_input_handler():
         while (navi_states.task_status != 4 or navi_states.task_status != 6) and not exit_input.is_set(): # not finish and not canceled and event is not exited
@@ -308,7 +336,7 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
                 raise Exception()
             
             navi_states = states.check_navigation_status()
-            logger.info(" ")
+            logger.info("")
             print(f"[Base] \'p + ENTER\' to pause")
             print(f"[Base] \'r + ENTER\' to resume")
             print(f"[Base] target wp: {str(navi_states.target_id)}")
