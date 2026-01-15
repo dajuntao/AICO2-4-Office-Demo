@@ -26,7 +26,7 @@ def sys_init(arm_L_sn, arm_R_sn, AMR_ip, logger):
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
     logger.info("")
 
-    logger.info("- - - - - - - ARMS INITIALIZATION - - - - - - - - -")
+    logger.info("- - - - - - - - ARMS INITIALIZATION - - - - - - - -")
     arm_pair = connect_arm_pair(arm_L_sn, arm_R_sn, logger)
     logger.info("")
 
