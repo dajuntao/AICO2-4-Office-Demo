@@ -172,7 +172,8 @@ def init_AMR(states, control, configure, logger):
 def execute_routines(arm_pair, AMR_states, navigator, arm_plans, logger):
     logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
     logger.info("- - - - - - - START RUNNING ROUTINES  - - - - - - -")
-    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -\n")
+    logger.info("- - - - - - - - - - - - - - - - - - - - - - - - - -")
+    logger.info("")
     
     try:
         # create two instances for both arms
