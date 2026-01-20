@@ -64,18 +64,23 @@ def connect_arm_pair(arm_L_sn, arm_R_sn, logger):
     # Enable the pair of robots, make sure the E-stop is released before enabling
     logger.info("[Arm] Enabling arms ...")
     arm_pair.Enable()
+    start_time = time.perf_counter()
 
-    # Wait for the arm to become operational
-    while not arm_pair.operational():
-        time.sleep(1)
-    logger.info("[Arm] Both arms are now operational\n")
-
-    logger.info("- - - - - - - GRIPPERS INITIALIZATION - - - - - - -")
+    # logger.info("- - - - - - - GRIPPERS INITIALIZATION - - - - - - -")
     # if the arms were not operational already, initialize grippers
     if not was_operational:
         logger.info("[Gripper] Initializing grippers ...")
-        init_gripper(arm_pair, logger)
+        # init_gripper(arm_pair, logger)
     logger.info("[Gripper] Both grippers are now initialized")
+
+    # Wait for the arm to become operational
+    while not arm_pair.operational():
+        if time.perf_counter() - start_time > 3:
+            raise Exception("[Arm] Arms cannot be enabled. Please check: " \
+                            "\n\t\t\t\t\t\t\t\t       1) if both arms are in \"Auto Remote\" mode; " \
+                            "\n\t\t\t\t\t\t\t\t       2) if all energency buttons are released")
+        time.sleep(1)
+    logger.info("[Arm] Both arms are now operational\n")
 
     return arm_pair
 
