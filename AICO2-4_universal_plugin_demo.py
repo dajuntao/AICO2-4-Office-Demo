@@ -70,7 +70,7 @@ def connect_arm_pair(arm_L_sn, arm_R_sn, logger):
     # if the arms were not operational already, initialize grippers
     if not was_operational:
         logger.info("[Gripper] Initializing grippers ...")
-        # init_gripper(arm_pair, logger)
+        init_gripper(arm_pair, logger)
     logger.info("[Gripper] Both grippers are now initialized")
 
     # Wait for the arm to become operational
