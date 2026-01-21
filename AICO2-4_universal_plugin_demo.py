@@ -64,6 +64,7 @@ def connect_arm_pair(arm_L_sn, arm_R_sn, logger):
     # Enable the pair of robots, make sure the E-stop is released before enabling
     logger.info("[Arm] Enabling arms ...")
     arm_pair.Enable()
+    time.sleep(1)
     start_time = time.perf_counter()
 
     # logger.info("- - - - - - - GRIPPERS INITIALIZATION - - - - - - -")
@@ -90,7 +91,7 @@ def init_gripper(arm_pair, logger):
     gripper_pair = flexivdrdk.GripperPair(arm_pair)
     gripper_pair.Enable(["Flexiv-GN01", "Flexiv-GN01"])
     gripper_pair.Init()
-    time.sleep(11)
+    time.sleep(10)
 
 
 # initialize Seer AMR API
