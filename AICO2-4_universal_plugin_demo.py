@@ -340,6 +340,7 @@ def move_AMR(states, navigator, arm_pair, logger, start, target):
         while ((navi_states.task_status == 2 or navi_states.task_status != 4) and navi_states.task_status != 6):
             if (arm_pair.fault() == True):
                 navigator.cancel_current_navigation()
+                exit_input.set()
                 raise Exception()
             
             navi_states = states.check_navigation_status()
